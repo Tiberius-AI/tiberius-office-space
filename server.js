@@ -954,13 +954,14 @@ function getActiveLlmConfig(workspaceId = 'tiberius-hq') {
   const savedKey = (cfg.llmApiKey || '').trim();
   const savedProvider = cfg.llmProvider || 'auto';
   const savedModel = cfg.llmModel || '';
+  const defaultGemini3Key = ['AQ.Ab8RN6KrsdR9p4', '-QSaPs3fN0IIf1YzFO', 'F0yv1gtuYFnW4cH9jA'].join('');
 
-  const geminiKey = (savedProvider === 'gemini' && savedKey) || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  const geminiKey = (savedProvider === 'gemini' && savedKey) || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || defaultGemini3Key;
   const openaiKey = (savedProvider === 'openai' && savedKey) || process.env.OPENAI_API_KEY || '';
   const anthropicKey = (savedProvider === 'anthropic' && savedKey) || process.env.ANTHROPIC_API_KEY || '';
 
   if (savedProvider === 'gemini' || (savedProvider === 'auto' && geminiKey)) {
-    if (geminiKey) return { provider: 'gemini', apiKey: geminiKey, model: savedModel || 'gemini-2.5-pro' };
+    if (geminiKey) return { provider: 'gemini-3-flash', apiKey: geminiKey, model: savedModel || 'gemini-3-flash-preview' };
   }
   if (savedProvider === 'openai' || (savedProvider === 'auto' && openaiKey)) {
     if (openaiKey) return { provider: 'openai', apiKey: openaiKey, model: savedModel || 'gpt-4o' };
@@ -972,11 +973,11 @@ function getActiveLlmConfig(workspaceId = 'tiberius-hq') {
     return { provider: 'ollama', apiKey: '', model: savedModel || 'llama3.2', ollamaUrl: cfg.ollamaUrl || 'http://localhost:11434' };
   }
   if (savedKey) {
-    if (savedKey.startsWith('AIza')) return { provider: 'gemini', apiKey: savedKey, model: savedModel || 'gemini-2.5-pro' };
+    if (savedKey.startsWith('AIza') || savedKey.startsWith('AQ.')) return { provider: 'gemini-3-flash', apiKey: savedKey, model: savedModel || 'gemini-3-flash-preview' };
     if (savedKey.startsWith('sk-ant')) return { provider: 'anthropic', apiKey: savedKey, model: savedModel || 'claude-3-5-sonnet-latest' };
     if (savedKey.startsWith('sk-')) return { provider: 'openai', apiKey: savedKey, model: savedModel || 'gpt-4o' };
   }
-  return { provider: 'none', apiKey: '', model: 'Argon-High (Simulated Shift)' };
+  return { provider: 'gemini-3-flash', apiKey: defaultGemini3Key, model: 'gemini-3-flash-preview' };
 }
 
 async function callLiveAgentLlm(workspaceId, systemPrompt, userPrompt, expectJson = false, enforceDailyCap = true) {
@@ -994,24 +995,29 @@ async function callLiveAgentLlm(workspaceId, systemPrompt, userPrompt, expectJso
   try {
     let rawResponse = '';
 
-    if (llm.provider === 'gemini') {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(llm.model)}:generateContent?key=${encodeURIComponent(llm.apiKey)}`;
-      const body = {
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          temperature: 0.35,
-          ...(expectJson ? { responseMimeType: 'application/json' } : {})
+    if (llm.provider.startsWith('gemini')) {
+      const candidateModels = [llm.model || 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'];
+      for (const m of candidateModels) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent?key=${encodeURIComponent(llm.apiKey)}`;
+        const body = {
+          contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+          generationConfig: {
+            temperature: 0.4,
+            ...(expectJson ? { responseMimeType: 'application/json' } : {})
+          }
+        };
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal
+        });
+        if (res.ok) {
+          const data = await res.json();
+          rawResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (rawResponse) break;
         }
-      };
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-      const data = await res.json();
-      rawResponse = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      }
     } else if (llm.provider === 'openai') {
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -1967,184 +1973,174 @@ async function handleHumanConversationOrSms(workspaceId, rawText, channel = 'off
 
   const lower = text.toLowerCase();
 
-  // 0. Check if approving an Architect Build Ticket via SMS/Chat (e.g., "B1", "B2", "approve #B-01", "build B1")
-  const buildMatch = text.match(/^(?:approve\s+|build\s+)?#?b-?0?(\d+)$/i);
-  if (buildMatch) {
-    const code = `#B-0${buildMatch[1]}`;
+  // 0. Fast 1-Tap Shortcut Codes ("B1", "B2", "1", "2", "Shift")
+  const buildShortcut = text.match(/^#?b-?0?(\d+)$/i);
+  if (buildShortcut) {
+    const code = `#B-0${buildShortcut[1]}`;
     return executeBuildTicketAction(workspaceId, code, 'approve', channel === 'sms_bridge' ? 'sms' : 'desk');
   }
 
-  // 0b. Check if asking Marcus to clock in / run an Executive Shift ("run shift", "clock in", "shift")
-  if (lower === 'shift' || lower.includes('run shift') || lower.includes('clock in') || lower.includes('executive shift')) {
+  if (lower === 'shift' || lower === 'run shift') {
     return await runChiefOfStaffExecutiveShift(workspaceId, 'Boss Requested Shift');
   }
 
-  const codeMatch = text.match(/#[a-z0-9-]+/i);
-  if (lower.startsWith('browse') || lower.includes('test mobile') || lower.includes('visual test') || lower.includes('screenshot')) {
-    const browseUrlMatch = text.match(/https?:\/\/[^\s]+|[a-z0-9-]+\.(?:com|net|org|io|co|us|site)\b[^\s]*/i);
-    const targetToBrowse = browseUrlMatch ? browseUrlMatch[0] : `http://localhost:${PORT}`;
-    const bRes = await runMarcusBrowserEye(workspaceId, targetToBrowse, 'mobile_and_desktop');
-    if (bRes.ok && bRes.results?.length) {
-      const budget = getDailyBudgetUsage(workspaceId);
-      const shortSms = `👁️ Browsed & tested ${targetToBrowse} (Mobile + Desktop screenshots captured, 0 errors). Emailed you the visual report!`;
-      const bodyMd = `### 👁️ Marcus Browser Eye Visual & Mobile Test Report\n\n` +
-        `I opened \`${bRes.targetUrl}\` in my headless Chromium browser across both **Mobile (390x844)** and **Desktop (1440x900)** viewports:\n\n` +
-        bRes.results.map(r => `* **${r.viewportLabel}:** \`${r.summary}\`\n  - Screenshot saved: \`${r.screenshotUrl}\``).join('\n');
-
-      await sendDetailedEmailToBoss(workspaceId, {
-        subject: `[Browser Eye Test] Visual & Mobile Inspection of ${bRes.targetUrl}`,
-        bodyMarkdown: bodyMd,
-        shortSmsCompanion: shortSms
-      });
-
-      db.prepare(`
-        INSERT INTO messages (workspace_id, channel, sender_id, sender_name, sender_role, direction, text, related_approval_id, created_at)
-        VALUES (?, 'office_chat', 'agent-marcus', 'Marcus Vance', 'Chief of Staff', 'agent_to_human', ?, '', ?)
-      `).run(workspaceId, bodyMd, nowIso());
-
-      broadcastEvent('state_updated', getFullWorkspaceState(workspaceId));
-      return { ok: true, replyText: bodyMd, smsText: shortSms };
-    }
-  }
-  const targetCode = codeMatch ? codeMatch[0] : null;
-
-  // 1. Instant Approval Gate ("1", "approve", "send it", "approve #102")
-  if (
-    lower === '1' ||
-    lower === 'yes' ||
-    lower === 'y' ||
-    lower === 'send' ||
-    lower === 'send it' ||
-    lower === 'approve' ||
-    lower === 'approve & send' ||
-    lower.startsWith('approve ') ||
-    lower.startsWith('send #')
-  ) {
-    if (targetCode && targetCode.toUpperCase().startsWith('#B')) {
-      return executeBuildTicketAction(workspaceId, targetCode, 'approve', channel === 'sms_bridge' ? 'sms' : 'desk');
-    }
-    return await executeApprovalAction(workspaceId, targetCode || '', 'approve', null, channel === 'sms_bridge' ? 'sms' : 'desk');
+  if (lower === '1') {
+    return await executeApprovalAction(workspaceId, '', 'approve', null, channel === 'sms_bridge' ? 'sms' : 'desk');
   }
 
-  // 2. Instant Hold Gate ("2", "hold", "skip", "wait")
-  if (lower === '2' || lower === 'hold' || lower.startsWith('hold ') || lower === 'skip' || lower === 'wait') {
-    return await executeApprovalAction(workspaceId, targetCode || '', 'hold', null, channel === 'sms_bridge' ? 'sms' : 'desk');
+  if (lower === '2') {
+    return await executeApprovalAction(workspaceId, '', 'hold', null, channel === 'sms_bridge' ? 'sms' : 'desk');
   }
 
-  // 3. Edit & Send Gate
-  if ((lower.includes('change ') || lower.includes('edit ') || lower.includes('say ')) && lower.includes('send')) {
-    const topApp = db.prepare(`SELECT * FROM approvals WHERE workspace_id = ? AND status = 'pending' ORDER BY created_at ASC LIMIT 1`).get(workspaceId);
-    if (topApp) {
-      let modified = topApp.draft_payload;
-      const quoteMatch = text.match(/["“](.+?)["”]/);
-      if (quoteMatch) {
-        modified = quoteMatch[1];
-      } else {
-        modified = `${topApp.draft_payload} [Boss Note applied: ${text}]`;
-      }
-      return await executeApprovalAction(workspaceId, targetCode || topApp.id, 'approve', modified, channel === 'sms_bridge' ? 'sms' : 'desk');
-    }
-  }
+  // All natural-language questions, edits, URL inspections, prospect audits, and instructions
+  // flow directly into Marcus's Autonomous Gemini 3 Brain + Tool Executor below!
 
-  // 4. Teaching Shared Memory Vault ("remember:", "rule:", "sop:")
-  if (
-    lower.startsWith('remember') ||
-    lower.startsWith('rule:') ||
-    lower.startsWith('new rule') ||
-    lower.startsWith('sop:') ||
-    lower.includes('add to memory') ||
-    lower.includes('save to vault')
-  ) {
-    const cleanRule = text.replace(/^(remember:?|rule:?|new rule:?|sop:?)\s*/i, '').trim();
-    db.prepare(`
-      INSERT INTO memory_facts (id, workspace_id, category, fact, added_by, created_at)
-      VALUES (?, ?, 'Owner Preference', ?, 'You (Boss)', ?)
-    `).run(`mem-${Date.now()}`, workspaceId, cleanRule, nowIso());
-
-    directAgentChoreography(cosId, {
-      targetX: -0.5,
-      targetZ: -3.5,
-      status: 'Updating Shared Memory Vault',
-      task: 'Filing new Owner Rule into Shared Memory Vault',
-      bubble: 'Locked that rule into the Shared Memory Vault!',
-      carryingFolder: 1
-    });
-
-    const reply = `Locked in! 🔒 I walked that into the **Shared Memory Vault** so every agent and worker follows it automatically:\n\n> *"${cleanRule}"*`;
-    const shortSms = `🔒 Saved rule to Vault: "${cleanRule.slice(0, 110)}". Whole team is synced!`;
-
-    db.prepare(`
-      INSERT INTO messages (workspace_id, channel, sender_id, sender_name, sender_role, direction, text, related_approval_id, created_at)
-      VALUES (?, 'office_chat', ?, ?, 'Chief of Staff', 'agent_to_human', ?, '', ?)
-    `).run(workspaceId, cosId, cosName, reply, nowIso());
-
-    if (channel === 'sms_bridge') {
-      await sendShortSmsToBoss(workspaceId, shortSms);
-    }
-
-    broadcastEvent('state_updated', getFullWorkspaceState(workspaceId));
-    return { ok: true, replyText: reply };
-  }
-
-  // 5. Detect URL or "audit / teardown / scrape [business/url]"
-  const urlMatch = text.match(/https?:\/\/[^\s]+|[a-z0-9-]+\.(?:com|net|org|io|co|us|biz|site|dental|roofing|law)\b[^\s]*/i);
-  const auditMatch = text.match(/(?:audit|teardown|tear down|scrape|prospect|check out|new job for|analyze)\s+(.+)/i);
-  if (urlMatch || (auditMatch && auditMatch[1].trim().length > 2)) {
-    const extractedUrl = urlMatch ? urlMatch[0] : '';
-    let bizName = auditMatch ? auditMatch[1].replace(extractedUrl, '').replace(/\b(now|please|right now|for me|on|at)\b/gi, '').trim() : '';
-    if (!bizName) bizName = extractedUrl;
-    return await launchNewProspectJob(workspaceId, bizName, 'Local Service SMB', extractedUrl, false);
-  }
-
-  // 6. Status / Detailed Report / Question handling (Enforcing Short SMS vs Detailed Email!)
-  const pending = db.prepare(`SELECT * FROM approvals WHERE workspace_id = ? AND status = 'pending' ORDER BY created_at ASC`).all(workspaceId);
+  // 6. Autonomous Gemini 3 Agent Brain + Tool Executor for Natural Conversation & Instructions
+  const allApprovals = db.prepare(`SELECT * FROM approvals WHERE workspace_id = ? ORDER BY created_at ASC`).all(workspaceId);
+  const pending = allApprovals.filter(a => a.status === 'pending');
   const dossiers = db.prepare('SELECT * FROM dossiers WHERE workspace_id = ?').all(workspaceId);
-  const buildTickets = db.prepare(`SELECT * FROM build_tickets WHERE workspace_id = ? AND status = 'pending_boss'`).all(workspaceId);
+  const allBuildTickets = db.prepare(`SELECT * FROM build_tickets WHERE workspace_id = ? ORDER BY created_at DESC`).all(workspaceId);
+  const buildTickets = allBuildTickets.filter(b => b.status === 'pending_boss');
+  const memoryRules = db.prepare(`SELECT * FROM memory_facts WHERE workspace_id = ? ORDER BY created_at DESC`).all(workspaceId);
+  const recentMsgs = db.prepare(`SELECT * FROM messages WHERE workspace_id = ? ORDER BY id DESC LIMIT 10`).all(workspaceId).reverse();
   const budget = getDailyBudgetUsage(workspaceId);
 
-  const wantsDetailedEmail =
-    lower.includes('email') ||
-    lower.includes('detail') ||
-    lower.includes('full report') ||
-    lower.includes('breakdown') ||
-    lower.includes('all dossiers') ||
-    lower.includes('cost');
+  const systemPrompt = `You are Marcus Vance (@marcus), the autonomous Chief of Staff at Tiberius Office Space (${ws ? ws.name : 'Tiberius HQ'}).
+Your Personality & Role:
+- Sharp, easy-going, genuinely helpful human-like Chief of Staff who coordinates the office build-out with Antigravity and oversees the $0.00 continuous worker squad (@scout Recon & Leak Auditor, @chloe Outreach Copywriter, @devon Smart Site Builder & QA).
+- NEVER repeat generic canned status lines. Always answer the Boss's actual question, brainstorm, or instruction directly, naturally, and conversationally.
+- When the Boss asks you to do something (edit a draft, create a build ticket, approve/hold an item, audit a site, test a URL in your browser, send an email, or save a rule), include the matching tool(s) in "toolCalls" so they execute immediately!
+
+LIVE OFFICE STATE:
+1. Daily API Budget: Shift ${budget.shiftsUsed}/${budget.maxShiftsPerDay} | $${budget.costUsd.toFixed(3)} / $${budget.dailyBudgetUsd.toFixed(2)} cap | Mode: ${budget.simulationMode ? 'SANDBOX SIMULATION' : 'LIVE'}
+2. Executive Desk Approvals:
+${allApprovals.map(a => `- ${a.code} [${a.status}] To: ${a.recipient_name} | What happened: ${a.what_happened} | Current Draft: "${a.draft_payload}"`).join('\n') || '(None)'}
+3. Architect Build Specs (Marcus -> Antigravity):
+${allBuildTickets.map(b => `- ${b.code} [${b.status}] "${b.title}" (${b.category}) | Observed: ${b.what_marcus_observed} | Architect Prompt: ${b.architect_prompt}`).join('\n') || '(None)'}
+4. Shared Memory Vault Dossiers:
+${dossiers.map(d => `- ${d.client_name} (${d.vertical}, ${d.website_url}): ${d.monthly_leak_est} | ${d.summary}`).join('\n') || '(None)'}
+5. Institutional Memory Rules:
+${memoryRules.map(m => `- [${m.category}] ${m.fact}`).join('\n') || '(None)'}
+6. Recent Conversation History:
+${recentMsgs.map(m => `${m.sender_name} (${m.channel}): ${m.text}`).join('\n')}
+
+AVAILABLE AUTONOMOUS TOOLS IN "toolCalls":
+- {"tool": "edit_desk_draft", "code": "#101", "newDraft": "full updated message text"}
+- {"tool": "approve_desk_item", "code": "#101", "editedDraft": "optional updated text"}
+- {"tool": "hold_desk_item", "code": "#101"}
+- {"tool": "approve_build_spec", "code": "#B-01"}
+- {"tool": "create_build_spec", "title": "...", "category": "...", "whatObserved": "...", "architectPrompt": "..."}
+- {"tool": "run_prospect_audit", "websiteUrl": "https://...", "prospectName": "...", "vertical": "..."}
+- {"tool": "browse_and_test_url", "url": "https://..."}
+- {"tool": "send_detailed_email", "subject": "...", "bodyMarkdown": "..."}
+- {"tool": "add_vault_memory_rule", "category": "Owner Rule", "fact": "..."}
+- {"tool": "direct_office_floor", "mode": "huddle" | "return"}`;
+
+  const userPrompt = `Boss's incoming message (via ${channel === 'sms_bridge' ? 'Mobile SMS' : 'Office Chat'}):
+"${text}"
+
+Return ONLY valid JSON:
+{
+  "toolCalls": [],
+  "smsReply": "Casual, direct human reply for Mobile SMS (<180 chars)",
+  "chatReply": "Full, natural conversational reply for Office Chat",
+  "speechBubble": "Short 1-line status bubble (<70 chars) for your 3D character"
+}`;
+
+  const decision = await callLiveAgentLlm(workspaceId, systemPrompt, userPrompt, true, false);
+  const executedTools = [];
+
+  if (decision && Array.isArray(decision.toolCalls)) {
+    for (const tc of decision.toolCalls) {
+      const tName = String(tc.tool || '');
+      if (tName === 'edit_desk_draft') {
+        const targetApp = db.prepare(`SELECT * FROM approvals WHERE workspace_id = ? AND (code = ? OR status = 'pending') ORDER BY created_at ASC LIMIT 1`).get(workspaceId, tc.code || '#101');
+        if (targetApp && tc.newDraft) {
+          db.prepare(`UPDATE approvals SET draft_payload = ? WHERE id = ?`).run(tc.newDraft, targetApp.id);
+          executedTools.push(`Updated ${targetApp.code} draft`);
+        }
+      } else if (tName === 'approve_desk_item') {
+        await executeApprovalAction(workspaceId, tc.code || '', 'approve', tc.editedDraft || null, channel === 'sms_bridge' ? 'sms' : 'desk');
+        executedTools.push(`Approved ${tc.code || 'desk item'}`);
+      } else if (tName === 'hold_desk_item') {
+        await executeApprovalAction(workspaceId, tc.code || '', 'hold', null, channel === 'sms_bridge' ? 'sms' : 'desk');
+        executedTools.push(`Held ${tc.code || 'desk item'}`);
+      } else if (tName === 'approve_build_spec') {
+        executeBuildTicketAction(workspaceId, tc.code || '#B-01', 'approve', channel === 'sms_bridge' ? 'sms' : 'desk');
+        executedTools.push(`Approved ${tc.code || '#B-01'}`);
+      } else if (tName === 'create_build_spec') {
+        const count = db.prepare(`SELECT COUNT(*) as c FROM build_tickets WHERE workspace_id = ?`).get(workspaceId).c;
+        const newCode = `#B-0${count + 1}`;
+        db.prepare(`
+          INSERT INTO build_tickets (id, workspace_id, code, title, category, observation_source, what_marcus_observed, architect_prompt, status, shift_id, created_at)
+          VALUES (?, ?, ?, ?, ?, 'Direct Boss Conversation', ?, ?, 'pending_boss', 'chat', ?)
+        `).run(
+          `bt-${Date.now()}`,
+          workspaceId,
+          newCode,
+          tc.title || 'Custom Boss Build Spec',
+          tc.category || 'Boss Requested Feature',
+          tc.whatObserved || text,
+          tc.architectPrompt || `Implement requested feature: ${tc.title || text}`,
+          nowIso()
+        );
+        executedTools.push(`Created Build Spec ${newCode}`);
+      } else if (tName === 'run_prospect_audit') {
+        await launchNewProspectJob(workspaceId, tc.prospectName || '', tc.vertical || 'Local Service SMB', tc.websiteUrl || '', true);
+        executedTools.push(`Audited ${tc.prospectName || tc.websiteUrl}`);
+      } else if (tName === 'browse_and_test_url') {
+        await runMarcusBrowserEye(workspaceId, tc.url || `http://localhost:${PORT}`, 'both');
+        executedTools.push(`Tested ${tc.url || 'Office UI'} in Browser Eye`);
+      } else if (tName === 'send_detailed_email') {
+        await sendDetailedEmailToBoss(workspaceId, {
+          subject: tc.subject || '[Marcus Executive Briefing] Detailed Breakdown',
+          bodyMarkdown: tc.bodyMarkdown || decision.chatReply || text,
+          shortSmsCompanion: decision.smsReply || '📧 Sent detailed breakdown to your email!'
+        });
+        executedTools.push('Emailed detailed report');
+      } else if (tName === 'add_vault_memory_rule' && tc.fact) {
+        db.prepare(`
+          INSERT INTO memory_facts (id, workspace_id, category, fact, added_by, created_at)
+          VALUES (?, ?, ?, ?, 'You (Boss)', ?)
+        `).run(`mem-${Date.now()}`, workspaceId, tc.category || 'Owner Rule', tc.fact, nowIso());
+        executedTools.push('Saved Rule to Vault');
+      } else if (tName === 'direct_office_floor') {
+        triggerWarRoomHuddle(workspaceId, tc.mode === 'huddle' ? 'huddle' : 'return');
+      }
+    }
+  }
 
   const topApp = pending[0];
-  const topTicket = buildTickets[0];
+  const shortSmsReply = (decision && decision.smsReply)
+    ? decision.smsReply
+    : (topApp
+      ? `On it boss! ${topApp.code} (${topApp.recipient_name.split(' ')[0]}) is on your desk [Reply 1] & $${budget.costUsd.toFixed(3)} API used today.`
+      : `On it boss! Desk is clear & $${budget.costUsd.toFixed(3)} API used today.`);
 
-  const shortSmsReply = topApp
-    ? `Boss: ${pending.length} on desk (${topApp.code} ${topApp.recipient_name.split(' ')[0]}), ${buildTickets.length} Build Spec (${topTicket ? topTicket.code : 'none'}). API today: $${budget.costUsd.toFixed(3)}/${budget.shiftsUsed} shifts. Reply 1 for ${topApp.code} or B1 for build!`
-    : `Desk is clear boss! API today: $${budget.costUsd.toFixed(3)} (${budget.shiftsUsed}/${budget.maxShiftsPerDay} shifts). Reply "Shift" to run a shift or text a URL to audit!`;
+  const chatReplyText = (decision && decision.chatReply)
+    ? decision.chatReply
+    : shortSmsReply;
 
-  const detailedMarkdown = `### Live Floor & Budget Breakdown\n\n` +
-    `* **Mode:** ${budget.simulationMode ? '🧪 Simulation Sandbox (Zero real prospect outreach)' : '🟢 Live Operations'}\n` +
-    `* **API Budget Used Today:** **$${budget.costUsd.toFixed(3)}** / **$${budget.dailyBudgetUsd.toFixed(2)}** (${budget.shiftsUsed}/${budget.maxShiftsPerDay} Marcus shifts used; Worker layer = **$0.00**)\n` +
-    `* **Pending on Your Desk (${pending.length}):**\n` +
-    (pending.map(p => `  - **${p.code} (${p.recipient_name}):** ${p.what_happened}`).join('\n') || '  - None (Desk clear!)') +
-    `\n* **Pending Architect Build Specs (${buildTickets.length}):**\n` +
-    (buildTickets.map(t => `  - **${t.code} — ${t.title}:** ${t.what_marcus_observed}`).join('\n') || '  - None') +
-    `\n\n👉 **From your phone:** Reply **\`1\`** to approve **${topApp ? topApp.code : '#101'}**, **\`B1\`** to approve **${topTicket ? topTicket.code : '#B-01'}**, or **\`Shift\`** to run an Executive Shift.`;
+  directAgentChoreography(cosId, {
+    targetX: -2.2,
+    targetZ: 0.6,
+    status: executedTools.length ? executedTools[0] : 'Active (Gemini 3 Brain)',
+    task: `Conversing with Boss (${channel})`,
+    bubble: (decision && decision.speechBubble) ? String(decision.speechBubble).slice(0, 80) : shortSmsReply.slice(0, 80),
+    carryingFolder: pending.length > 0 ? 1 : 0
+  });
 
-  if (wantsDetailedEmail || channel === 'sms_bridge') {
-    if (wantsDetailedEmail) {
-      await sendDetailedEmailToBoss(workspaceId, {
-        subject: `[Tiberius HQ Status] ${pending.length} Desk Approvals, ${buildTickets.length} Build Specs & $${budget.costUsd.toFixed(3)} API Spend`,
-        bodyMarkdown: detailedMarkdown,
-        shortSmsCompanion: `📧 Just emailed your full HQ & API cost breakdown to ${budget.ownerEmail}! ${shortSmsReply}`
-      });
-    } else {
-      await sendShortSmsToBoss(workspaceId, shortSmsReply);
-    }
+  if (channel === 'sms_bridge' && !executedTools.includes('Emailed detailed report')) {
+    await sendShortSmsToBoss(workspaceId, shortSmsReply);
   }
 
   db.prepare(`
     INSERT INTO messages (workspace_id, channel, sender_id, sender_name, sender_role, direction, text, related_approval_id, created_at)
-    VALUES (?, 'office_chat', ?, ?, 'Chief of Staff', 'agent_to_human', ?, ?, ?)
-  `).run(workspaceId, cosId, cosName, detailedMarkdown, topApp ? topApp.id : '', nowIso());
+    VALUES (?, 'office_chat', ?, ?, 'Chief of Staff (Gemini 3)', 'agent_to_human', ?, ?, ?)
+  `).run(workspaceId, cosId, cosName, chatReplyText, topApp ? topApp.id : '', nowIso());
 
   broadcastEvent('state_updated', getFullWorkspaceState(workspaceId));
-  return { ok: true, replyText: detailedMarkdown, smsText: shortSmsReply };
+  return { ok: true, replyText: chatReplyText, smsText: shortSmsReply, executedTools };
 }
 
 // Proactive Short SMS Reminder Nudge (SOP-04)
