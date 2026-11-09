@@ -925,7 +925,16 @@ function renderFullUI(state) {
   document.getElementById('workspace-tagline').textContent = state.workspace.tagline;
   const pendingApprovals = state.approvals.filter(a => a.status === 'pending');
   const pendingBuilds = (state.buildTickets || []).filter(b => b.status === 'pending_boss');
-  const budget = state.workspace.budget || { shiftsUsed: 1, maxShiftsPerDay: 4, costUsd: 0.012, dailyBudgetUsd: 0.50, simulationMode: true, ownerEmail: 'boss@tiberius.site' };
+  const budget = state.workspace.budget || state.budgetStatus || {
+    shiftsUsed: 1,
+    maxShiftsPerDay: 4,
+    costUsd: 0.012,
+    dailyBudgetUsd: 0.50,
+    tokensIn: 1420,
+    tokensOut: 480,
+    simulationMode: true,
+    ownerEmail: 'boss@tiberius.ai'
+  };
 
   const sandboxText = document.getElementById('pill-sandbox-text');
   if (sandboxText) {
@@ -1040,9 +1049,9 @@ function renderFullUI(state) {
         <span class="approval-code">${budget.shiftsUsed} / ${budget.maxShiftsPerDay} Shifts Today</span>
       </div>
       <div style="font-size:11.5px;color:#cbd5e1;margin-bottom:6px;">
-        • <strong>Marcus API Spend Today:</strong> <strong style="color:#34d399;">$${budget.costUsd.toFixed(3)}</strong> of <strong>$${budget.dailyBudgetUsd.toFixed(2)} hard daily cap</strong> (${budget.tokensIn.toLocaleString()} in / ${budget.tokensOut.toLocaleString()} out tokens)<br/>
+        • <strong>Marcus API Spend Today:</strong> <strong style="color:#34d399;">$${(budget.costUsd || 0).toFixed(3)}</strong> of <strong>$${(budget.dailyBudgetUsd || 0.5).toFixed(2)} hard daily cap</strong> (${(budget.tokensIn || 0).toLocaleString()} in / ${(budget.tokensOut || 0).toLocaleString()} out tokens)<br/>
         • <strong>Continuous Worker Layer (@scout, @chloe, @devon):</strong> <strong style="color:#34d399;">$0.00 token cost</strong> (local Node/SQLite automations)<br/>
-        • <strong>Comms Rule:</strong> Short text (&lt;180 chars) via SMS • Detailed reports &amp; Build Specs via Email (<code>${escapeHtml(budget.ownerEmail)}</code>)
+        • <strong>Comms Rule:</strong> Short text (&lt;180 chars) via SMS • Detailed reports &amp; Build Specs via Email (<code>${escapeHtml(budget.ownerEmail || 'boss@tiberius.ai')}</code>)
       </div>
       <div style="width:100%;height:7px;background:#0f172a;border-radius:999px;overflow:hidden;">
         <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#10b981,#38bdf8);"></div>
