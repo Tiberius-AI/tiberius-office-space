@@ -248,7 +248,7 @@ function seedDatabaseIfNeeded() {
       '+1 (512) 555-0199',
       'simulator',
       JSON.stringify({
-        ownerEmail: 'boss@tiberius.site',
+        ownerEmail: 'feedbackdaisy@gmail.com',
         simulationMode: true,
         maxShiftsPerDay: 4,
         dailyBudgetUsd: 0.50,
@@ -272,7 +272,7 @@ function seedDatabaseIfNeeded() {
       '+1 (512) 555-0144',
       'simulator',
       JSON.stringify({
-        ownerEmail: 'mike@apexroofing.example.com',
+        ownerEmail: 'feedbackdaisy+apex@gmail.com',
         simulationMode: true,
         maxShiftsPerDay: 4,
         dailyBudgetUsd: 0.50,
@@ -417,9 +417,9 @@ function seedDatabaseIfNeeded() {
       '#ec4899',
       '#f472b6',
       'Human team member sharing the exact same Dossier filing cabinets.',
-      5.2, -3.2,
-      5.2, -3.2,
-      5.2, -3.2,
+      6.8, -3.2,
+      6.8, -3.2,
+      6.8, -3.2,
       0,
       'Updated Sterling Mortgage brand assets in Vault Drawer #3.',
       futureBubble
@@ -588,7 +588,7 @@ function seedDatabaseIfNeeded() {
       '[SIMULATION] Dr. Miller Dental — GBP Map-Pack Teardown',
       'Email (Sandbox Dry-Run)',
       'Dr. Grant Miller',
-      'dr.miller@millerdental-westlake.example.com',
+      'feedbackdaisy+miller@gmail.com',
       'Scout completed a $0 simulated GBP & schema audit on Miller Dental ($5,100/mo Invisalign leak).',
       'Prepared a plain-English note offering our 60-second Westlake Map-Pack comparison.',
       'Reply "Approve #102" or click Approve & Send to test this simulated dispatch.',
@@ -685,7 +685,7 @@ function seedDatabaseIfNeeded() {
       'email-01',
       'tiberius-hq',
       'Marcus Vance (Chief of Staff • Tiberius HQ)',
-      'boss@tiberius.site',
+      'feedbackdaisy@gmail.com',
       '[Shift 1/4 Report] 2 Simulated Audits Complete ($0.012 API Cost) + Architect Build Specs #B-01 & #B-02',
       shortSms1,
       `### Morning Boss — Shift #1 Executive Briefing\n\nI clocked in for a 30-second high-reasoning shift to review what our **$0.00 local worker automations** completed and ran a browser observation pass on the Office Space build-out.\n\n#### 1. API Budget & Shift Meter\n* **Shift Used:** 1 of 4 daily shifts\n* **Worker Tasks Run ($0.00 Token Cost):** 2 full simulated prospect teardowns (*Apex Roofing*, *Miller Dental*)\n* **Marcus Shift Token Cost:** 2,140 in / 480 out = **$0.012** (Daily Cap: **$0.50** — **97.6% budget remaining**)\n* **Current Status:** Clocked back out to **$0 Automation Mode**\n\n#### 2. Browser & Workflow Observations -> Architect Build Queue\nBased on watching the simulated tasks and inspecting the browser UI, I wrote two **Architect Build Prompts** for Antigravity:\n* **#B-01 (SOP Automation):** *Add Simulated Prospect Reply Simulator & Follow-Up Cadence Tracker* — so when we approve a simulated text like #101, we can simulate the business owner replying *"Sure, send the screenshot!"* and test Step 2 of our SOP before doing any real outreach.\n* **#B-02 (UI / Floorplan):** *Department Workstation Status & Cost Ticker*.\n\n#### 3. What You Should Do Next (From Work)\n* **To approve Build Spec #B-01 for Antigravity:** Just reply **\`B1\`** to my text message (or click **Approve Build Spec** in the Build-Out tab).\n* **To test-fire Simulated Approval #101 (Apex Roofing):** Reply **\`1\`** to my text message.`,
@@ -943,7 +943,10 @@ function getDailyBudgetUsage(workspaceId = 'tiberius-hq') {
     withinBudget: withinShiftCap && withinCostCap,
     simulationMode: cfg.simulationMode !== false,
     marcusDutyState: cfg.marcusDutyState || 'OFF_DUTY_AUTOMATIONS',
-    ownerEmail: cfg.ownerEmail || 'boss@tiberius.site'
+    ownerEmail:
+      cfg.ownerEmail && !/@(tiberius\.site|example\.com)$/i.test(cfg.ownerEmail)
+        ? cfg.ownerEmail
+        : 'feedbackdaisy@gmail.com'
   };
 }
 
@@ -1221,11 +1224,35 @@ async function sendShortSmsToBoss(workspaceId, rawShortText, relatedId = '', has
   return shortText;
 }
 
+// Never send fictional or unresolvable domains to Resend API
+const dnsPromises = require('node:dns').promises;
+const FICTIONAL_OFFICE_EMAIL_REGEX =
+  /@(tiberius\.site|example\.com|contractor\.com|company\.com|gvconcretepaving\.com|hillcountrystandingseam\.com|comalmep\.com|balconesflatwork\.com|creeksidecustompools\.com|alamoturnover\.com)$/i;
+
+async function canDeliverOfficeEmail(rawEmail) {
+  const clean = String(rawEmail || '').trim().toLowerCase();
+  if (!clean || !clean.includes('@') || FICTIONAL_OFFICE_EMAIL_REGEX.test(clean)) return false;
+  const domain = clean.split('@')[1] || '';
+  try {
+    const mx = await Promise.race([
+      dnsPromises.resolveMx(domain),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('DNS_TIMEOUT')), 2500))
+    ]);
+    return Array.isArray(mx) && mx.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
 // Dispatch Detailed Executive Email to Boss + Companion Short SMS
 async function sendDetailedEmailToBoss(workspaceId, { subject, bodyMarkdown, shortSmsCompanion, relatedCode = '' }) {
   const ws = db.prepare('SELECT * FROM workspaces WHERE id = ?').get(workspaceId);
   const cfg = ws ? JSON.parse(ws.sms_config_json || '{}') : {};
-  const recipientEmail = cfg.ownerEmail || 'boss@tiberius.site';
+  const rawOwnerEmail = (cfg.ownerEmail || '').trim();
+  const recipientEmail =
+    rawOwnerEmail && !FICTIONAL_OFFICE_EMAIL_REGEX.test(rawOwnerEmail)
+      ? rawOwnerEmail
+      : 'feedbackdaisy@gmail.com';
   const cos = db.prepare(`SELECT * FROM actors WHERE workspace_id = ? AND desk_zone = 'chief_of_staff' LIMIT 1`).get(workspaceId);
   const senderName = cos ? `${cos.name} (Chief of Staff)` : 'Marcus Vance (Chief of Staff)';
 
@@ -1239,7 +1266,7 @@ async function sendDetailedEmailToBoss(workspaceId, { subject, bodyMarkdown, sho
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
   `).run(emailId, workspaceId, senderName, recipientEmail, subject, smsSent, bodyMarkdown, relatedCode, nowIso());
 
-  // Optional external email webhook or Resend API dispatch
+  // Optional external email webhook or Resend API dispatch (strictly gated against fictional emails)
   try {
     if (cfg.emailWebhookUrl && cfg.emailWebhookUrl.startsWith('http')) {
       fetch(cfg.emailWebhookUrl, {
@@ -1255,7 +1282,7 @@ async function sendDetailedEmailToBoss(workspaceId, { subject, bodyMarkdown, sho
         })
       }).catch(() => {});
     }
-    if (cfg.resendApiKey && recipientEmail) {
+    if (cfg.resendApiKey && recipientEmail && (await canDeliverOfficeEmail(recipientEmail))) {
       fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -1263,7 +1290,7 @@ async function sendDetailedEmailToBoss(workspaceId, { subject, bodyMarkdown, sho
           'Authorization': `Bearer ${cfg.resendApiKey}`
         },
         body: JSON.stringify({
-          from: 'Marcus Chief of Staff <onboarding@resend.dev>',
+          from: 'Marcus Chief of Staff <recon@send.tiberius.ai>',
           to: [recipientEmail],
           subject,
           text: bodyMarkdown
@@ -2175,10 +2202,10 @@ function triggerWarRoomHuddle(workspaceId, mode = 'huddle') {
   const actors = db.prepare(`SELECT * FROM actors WHERE workspace_id = ? AND actor_type = 'agent'`).all(workspaceId);
   if (mode === 'huddle') {
     const seats = [
-      { x: 4.2, z: -2.4, bubble: 'Standup: Reviewing $0 worker runs & Architect Build Queue.' },
-      { x: 5.8, z: -2.4, bubble: 'Standup: $0 scraper ready — zero token burn between shifts.' },
-      { x: 4.2, z: -4.0, bubble: 'Standup: Sandbox mode active — testing outreach safely.' },
-      { x: 5.8, z: -4.0, bubble: 'Standup: Browser observation logged for Marcus.' }
+      { x: 4.1, z: -1.9, bubble: 'Standup: Reviewing $0 worker runs & Architect Build Queue.' },
+      { x: 6.1, z: -1.9, bubble: 'Standup: $0 scraper ready — zero token burn between shifts.' },
+      { x: 4.1, z: -4.4, bubble: 'Standup: Sandbox mode active — testing outreach safely.' },
+      { x: 6.1, z: -4.4, bubble: 'Standup: Browser observation logged for Marcus.' }
     ];
     actors.forEach((a, i) => {
       const s = seats[i % seats.length];

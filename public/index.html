@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Tiberius Office Space • Autonomous Build-Out & Shift Command HQ</title>
+  <title>Tiberius Office Space • Playable AI Operations HQ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
   <script type="importmap">
     {
@@ -15,116 +18,162 @@
 </head>
 <body>
   <!-- ========================================================================
-       TOP EXECUTIVE COMMAND HUD BAR
+       CLEAN TOP GAME HUD BAR
        ======================================================================== -->
   <header class="top-hud">
     <div class="hud-brand-group">
-      <div class="brand-logo" title="Tiberius Office Space">T</div>
+      <button id="cam-reset-brand" class="brand-logo" title="Reset Camera to Full Office Overview" type="button">T</button>
       <div class="brand-titles">
         <div class="brand-title-row">
-          <span class="brand-name">TIBERIUS OFFICE SPACE</span>
-          <select id="workspace-select" class="workspace-select" title="Switch Company Workspace">
-            <option value="tiberius-hq">🏢 TIBERIUS HQ (Internal Agency)</option>
-            <option value="apex-roofing-hq">🏠 APEX ROOFING HQ (Client-Owned Asset Demo)</option>
+          <span class="brand-name">TIBERIUS OFFICE</span>
+          <select id="workspace-select" class="workspace-select" title="Switch Company Office Floor">
+            <option value="tiberius-hq">🏢 Tiberius HQ (Agency)</option>
+            <option value="apex-roofing-hq">🏠 Apex Roofing (Client Demo)</option>
           </select>
         </div>
-        <span id="workspace-tagline" class="brand-subtitle">Shift-Metered Chief of Staff • $0 Worker Automations • Short SMS + Detailed Email Bridge</span>
+        <span id="workspace-tagline" class="brand-subtitle">Click any character, desk, or room to play • $0 Workers Active</span>
       </div>
-    </div>
-
-    <div class="hud-status-pills">
-      <button id="pill-sandbox-mode" class="status-pill" title="Simulation Sandbox Lock: Prospect outreach runs as safe internal simulations">
-        <span class="dot dot-green"></span>
-        <span id="pill-sandbox-text">🧪 SANDBOX: SIMULATED TASKS</span>
-      </button>
-      <button id="pill-shift-budget" class="status-pill" title="Click to inspect Chief of Staff Daily API Budget & Shift Ledger">
-        <span class="dot dot-blue"></span>
-        <span id="pill-budget-text">SHIFT 1/4 • $0.012 / $0.50 CAP</span>
-      </button>
-      <button id="pill-desk-approvals" class="status-pill urgent" title="Click to view pending Approve & Send cards on your Executive Desk">
-        <span class="dot dot-amber"></span>
-        <span id="pill-approvals-text">2 ON DESK • 2 BUILD SPECS</span>
-      </button>
     </div>
 
     <div class="hud-actions">
-      <div class="view-switcher" role="group" aria-label="Visual Style Mode">
-        <button id="btn-mode-3d" class="view-btn active" title="Option 1: 3D Isometric Architectural Diorama">3D</button>
-        <button id="btn-mode-2d" class="view-btn" title="Option 2: High-Craft 2D Isometric Vector Floorplan">2D</button>
-      </div>
-      <button id="btn-run-shift" class="hud-btn hud-btn-primary" title="Wake Marcus for a 30s Argon-High Shift: Inspects $0 worker runs & browser UI, emails full report, texts short SMS">
-        <span>⏱️ Run Marcus Shift</span>
+      <button id="pill-shift-budget" class="status-pill" type="button" title="Inspect Chief of Staff Daily API Cap & Shift Ledger">
+        <span class="dot dot-green" id="budget-dot"></span>
+        <span id="pill-budget-text">Shift 1/4 • $0.012</span>
       </button>
-      <button id="btn-mobile-deploy" class="hud-btn" style="border-color:rgba(16,185,129,0.55);color:#6ee7b7;" title="Open Live Mobile URL, QR Code & How to Text Marcus">
-        <span>📲 Mobile Link &amp; Texting</span>
+
+      <button id="btn-run-shift" class="hud-btn hud-btn-primary" type="button" title="Wake Marcus for a metered shift: reviews $0 worker runs, checks UI, texts summary & emails full report">
+        <span>▶ Run Shift</span>
       </button>
-      <button id="btn-new-prospect" class="hud-btn" title="Have @scout run a $0.00 live website scrape or simulated prospect teardown">
-        <span>+ $0 Worker Audit</span>
+
+      <button id="btn-mobile-deploy" class="hud-btn hud-btn-icon" type="button" title="Mobile QR Code & Live SMS Link">
+        <span>📲</span>
+        <span class="hide-narrow">QR</span>
       </button>
-      <button id="btn-sms-nudge" class="hud-btn" title="Have Marcus send a short (<180 char) SMS nudge to your phone">
-        <span>⏰ Short SMS Nudge</span>
-      </button>
-      <button id="btn-toggle-phone" class="hud-btn hud-btn-phone" title="Toggle Phone (Short SMS + Detailed Email Inbox)">
-        <span>📱 Phone & Email</span>
-      </button>
-      <button id="btn-toggle-drawer" class="hud-btn" title="Toggle Split Executive Command Drawer">
-        <span>📋 Desk</span>
+
+      <button id="btn-open-settings-top" class="hud-btn hud-btn-icon" type="button" title="AI Cap, Sandbox Mode & SMS/Email Settings">
+        <span>⚙️</span>
       </button>
     </div>
   </header>
 
   <!-- ========================================================================
-       MAIN SPLIT WORKSPACE (FLOORPLAN STAGE + EXECUTIVE COMMAND DRAWER)
+       MAIN PLAYABLE 3D WORKSPACE + COLLAPSIBLE EXECUTIVE DRAWER
        ======================================================================== -->
   <main class="workspace-layout">
-    <!-- LEFT / MAIN: 3D & 2D ISOMETRIC OFFICE FLOORPLAN -->
+    <!-- FULL-BLEED 3D TOON DIORAMA STAGE -->
     <section id="office-stage" class="office-stage">
       <canvas id="three-canvas"></canvas>
-      <canvas id="vector-canvas" class="hidden"></canvas>
 
-      <!-- Floating DOM Layer for Zone Labels, Agent Nameplates & Clickable Speech Bubbles -->
+      <!-- Clean Sims-Style Emote Pips & Hover/Active Bark Layer -->
       <div id="floating-labels-layer" class="floating-labels-layer"></div>
 
-      <!-- Office Space Easter Egg / Action Toast -->
+      <!-- Single Clear Top-Center Focal Quest Pill ("What to Look At / What to Do") -->
+      <button id="pill-desk-approvals" class="quest-banner urgent" type="button" title="Click to zoom to your Boss Desk and review pending items">
+        <span class="quest-icon" id="quest-banner-icon">📋</span>
+        <span id="pill-approvals-text" class="quest-text">2 Approvals Waiting on Your Boss Desk</span>
+        <span class="quest-cta" id="quest-banner-cta">Open Desk →</span>
+      </button>
+
+      <!-- Playful Game Toast Notification -->
       <div id="office-toast" class="office-toast hidden"></div>
 
-      <!-- Bottom-Left Camera & Floor Choreography Controls -->
-      <div class="stage-overlay-controls">
-        <button id="cam-reset" class="cam-btn" title="Reset Isometric Overview">🎯 Overview</button>
-        <button id="cam-boss" class="cam-btn" title="Focus Executive Approval Desk">🗂️ Boss Desk</button>
-        <button id="cam-vault" class="cam-btn" title="Focus Shared Memory & SOP Vault">🗄️ Shared Vault</button>
-        <button id="cam-warroom" class="cam-btn" title="Gather Agents in War Room for Standup Huddle">🤝 War Room Standup</button>
-        <button id="cam-stapler" class="cam-btn" title="Inspect Red Swingline Stapler on Executive Desk">📎 Red Stapler</button>
+      <!-- Sims-Style Character / Object Inspector Card (Opens when clicking a character) -->
+      <aside id="actor-inspector" class="actor-inspector hidden" aria-live="polite">
+        <div class="inspector-header">
+          <div class="inspector-avatar" id="inspector-avatar">M</div>
+          <div class="inspector-meta">
+            <div class="inspector-name" id="inspector-name">Marcus Vance</div>
+            <div class="inspector-role" id="inspector-role">Chief of Staff</div>
+          </div>
+          <button type="button" id="inspector-close" class="inspector-close" title="Close Card">✕</button>
+        </div>
+        <div class="inspector-status-row">
+          <span class="inspector-status-pill" id="inspector-status">Ready</span>
+          <span class="inspector-cost-pill" id="inspector-cost">$0 Idle</span>
+        </div>
+        <div class="inspector-quote" id="inspector-quote">
+          "Hey boss — 2 items are ready on your desk whenever you want to take a look."
+        </div>
+        <div class="inspector-actions" id="inspector-actions"></div>
+      </aside>
+
+      <!-- Bottom Game Dock: Crew Portraits + 4 Primary Boss Actions -->
+      <div class="game-bottom-dock">
+        <div class="dock-island crew-dock" aria-label="Office Crew & Camera">
+          <button id="cam-reset" class="crew-util-btn" type="button" title="Reset Full Office Camera">
+            🎯 <span>Overview</span>
+          </button>
+          <div class="dock-divider"></div>
+          <div id="crew-roster-list" class="crew-roster-list"></div>
+          <div class="dock-divider"></div>
+          <button id="cam-warroom" class="crew-util-btn" type="button" title="Summon Crew to War Room for Standup Huddle">
+            🤝 <span>Standup</span>
+          </button>
+        </div>
+
+        <div class="dock-island actions-dock" aria-label="Boss Actions">
+          <button id="btn-toggle-drawer" class="game-dock-btn primary-desk" type="button" title="Open Your Boss Desk (Approve & Send Queue)">
+            <span class="dock-emoji">📥</span>
+            <span>Boss Desk</span>
+            <span id="dock-desk-badge" class="dock-badge">2</span>
+          </button>
+
+          <button id="btn-toggle-phone" class="game-dock-btn" type="button" title="Open Two-Way Short SMS & Email Phone">
+            <span class="dock-emoji">📱</span>
+            <span>Phone</span>
+          </button>
+
+          <button id="btn-open-vault" class="game-dock-btn" type="button" title="Open Shared Memory Dossiers & SOP Vault">
+            <span class="dock-emoji">🗄️</span>
+            <span>Vault</span>
+          </button>
+
+          <button id="btn-new-prospect" class="game-dock-btn accent-audit" type="button" title="Have @scout Run a $0.00 Live Website Audit">
+            <span class="dock-emoji">⚡</span>
+            <span>+ $0 Audit</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Hidden Legacy Hook Buttons Preserved for Programmatic Compatibility -->
+      <div class="sr-only" aria-hidden="true">
+        <button id="cam-boss" type="button"></button>
+        <button id="cam-vault" type="button"></button>
+        <button id="cam-stapler" type="button"></button>
+        <span id="pill-sandbox-text"></span>
       </div>
     </section>
 
-    <!-- RIGHT: OPTION 3 EXECUTIVE COMMAND & APPROVAL DESK DRAWER -->
-    <aside id="executive-drawer" class="executive-drawer">
+    <!-- RIGHT: COLLAPSIBLE EXECUTIVE COMMAND & APPROVAL DESK DRAWER (CLOSED BY DEFAULT!) -->
+    <aside id="executive-drawer" class="executive-drawer collapsed">
       <div class="drawer-header">
         <div class="drawer-title-row">
           <div class="drawer-title">
-            <span>Executive Command Desk</span>
+            <span>💼 Boss Command Desk</span>
           </div>
-          <button id="btn-sms-settings" class="cam-btn" title="Configure Daily API Cap, AI Brain, Short SMS & Email Bridge">🧠 AI Cap & Comms</button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button id="btn-sms-settings" class="cam-btn" type="button" title="Configure Daily API Cap, AI Brain, Short SMS & Email Bridge">🧠 AI Cap</button>
+            <button id="btn-close-drawer" class="cam-btn drawer-close-btn" type="button" title="Close Drawer & Return to Full 3D Office">✕</button>
+          </div>
         </div>
 
         <div class="drawer-tabs" style="grid-template-columns: repeat(5, 1fr);" role="tablist">
-          <button class="drawer-tab active" data-tab="tab-desk">
+          <button class="drawer-tab active" data-tab="tab-desk" type="button">
             <span>Desk</span>
             <span id="badge-pending-count" class="tab-badge">2</span>
           </button>
-          <button class="drawer-tab" data-tab="tab-build">
+          <button class="drawer-tab" data-tab="tab-build" type="button">
             <span>Build-Out</span>
             <span id="badge-build-count" class="tab-badge" style="background:#38bdf8;">2</span>
           </button>
-          <button class="drawer-tab" data-tab="tab-emails">
+          <button class="drawer-tab" data-tab="tab-emails" type="button">
             <span>Emails</span>
             <span id="badge-email-count" class="tab-badge" style="background:#a855f7;color:#fff;">1</span>
           </button>
-          <button class="drawer-tab" data-tab="tab-chat">
+          <button class="drawer-tab" data-tab="tab-chat" type="button">
             <span>Marcus</span>
           </button>
-          <button class="drawer-tab" data-tab="tab-vault">
+          <button class="drawer-tab" data-tab="tab-vault" type="button">
             <span>Vault/SOP</span>
           </button>
         </div>
@@ -141,8 +190,8 @@
           <div id="budget-ledger-box" class="beat-box" style="border-color:rgba(56,189,248,0.4);background:rgba(15,23,42,0.9);"></div>
 
           <div class="vault-section-title" style="margin-top:6px;">
-            <span>👁️ Marcus Browser Eye (Live Mobile &amp; Desktop Visual Testing)</span>
-            <button id="btn-run-browser-eye" class="cam-btn" style="background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.5);color:#6ee7b7;">📸 Test UI Now</button>
+            <span>👁️ Marcus Browser Eye (Live Mobile &amp; Desktop UI Test)</span>
+            <button id="btn-run-browser-eye" class="cam-btn" type="button" style="background:rgba(16,185,129,0.2);border-color:rgba(16,185,129,0.5);color:#6ee7b7;">📸 Test UI Now</button>
           </div>
           <div style="display:flex;gap:6px;margin-bottom:4px;">
             <input id="input-browser-url" type="text" class="chat-input" style="font-size:11.5px;padding:6px 9px;" value="http://localhost:3847" placeholder="URL for Marcus to browse & screenshot..." />
@@ -151,7 +200,7 @@
 
           <div class="vault-section-title" style="margin-top:8px;">
             <span>🛠️ Architect Build Specs (Marcus -&gt; Antigravity)</span>
-            <button id="btn-run-shift-inline" class="cam-btn">⏱️ + New Shift Inspection</button>
+            <button id="btn-run-shift-inline" class="cam-btn" type="button">⏱️ + New Shift</button>
           </div>
           <div id="build-tickets-container" style="display:flex;flex-direction:column;gap:10px;"></div>
         </div>
@@ -159,7 +208,7 @@
         <!-- TAB 3: DETAILED EXECUTIVE EMAILS (COMPANION TO SHORT SMS) -->
         <div id="tab-emails" class="tab-pane">
           <div class="beat-box" style="font-size:11.5px;border-color:rgba(168,85,247,0.4);">
-            <strong style="color:#d8b4fe;">📬 Short SMS + Detailed Email Protocol:</strong> When you're at work, Marcus keeps SMS texts short (&lt;180 chars) and sends full shift reports, multi-point teardowns, and Architect Build Specs here to your email.
+            <strong style="color:#d8b4fe;">📬 Short SMS + Detailed Email Protocol:</strong> When you're at work, Marcus keeps SMS texts short (&lt;180 chars) and sends full shift reports, teardowns, and Build Specs here to your email.
           </div>
           <div id="emails-list-container" style="display:flex;flex-direction:column;gap:10px;"></div>
         </div>
@@ -169,10 +218,10 @@
           <div class="chat-container">
             <div id="chat-messages-list" class="chat-messages"></div>
             <div class="chat-quick-prompts">
-              <button class="prompt-chip" data-prompt="Run shift">⏱️ Run Executive Shift</button>
-              <button class="prompt-chip" data-prompt="Approve B1">🛠️ Approve Build #B-01</button>
-              <button class="prompt-chip" data-prompt="Email me a full breakdown of all dossiers and costs">📧 Email Full Breakdown</button>
-              <button class="prompt-chip" data-prompt="Audit https://example.com">🌐 $0 Live Scrape</button>
+              <button class="prompt-chip" data-prompt="Run shift" type="button">⏱️ Run Shift</button>
+              <button class="prompt-chip" data-prompt="Approve B1" type="button">🛠️ Approve #B-01</button>
+              <button class="prompt-chip" data-prompt="Email me a full breakdown of all dossiers and costs" type="button">📧 Email Breakdown</button>
+              <button id="btn-sms-nudge" class="prompt-chip" type="button" title="Send a test <180 char SMS nudge to your phone">⏰ Test SMS Nudge</button>
             </div>
             <form id="chat-form" class="chat-input-row">
               <input id="chat-input" type="text" class="chat-input" placeholder="Talk to Marcus (e.g. 'B1', '1', 'Run shift', 'Email me full report')" autocomplete="off" />
@@ -184,13 +233,13 @@
         <!-- TAB 5: SHARED MEMORY VAULT (DOSSIERS + INSTITUTIONAL RULES + SOPS) -->
         <div id="tab-vault" class="tab-pane">
           <div class="vault-section-title">
-            <span>🔒 Institutional Shared Memory & Owner Rules</span>
-            <button id="btn-add-rule-inline" class="cam-btn">+ Add Rule</button>
+            <span>🔒 Institutional Shared Memory &amp; Owner Rules</span>
+            <button id="btn-add-rule-inline" class="cam-btn" type="button">+ Add Rule</button>
           </div>
           <div id="memory-facts-container" style="display:flex;flex-direction:column;gap:8px;"></div>
 
           <div class="vault-section-title" style="margin-top:12px;">
-            <span>🗄️ Client & Prospect Dossiers ($0 Worker + Human Shared)</span>
+            <span>🗄️ Client &amp; Prospect Dossiers ($0 Worker + Human Shared)</span>
           </div>
           <div id="dossiers-container" style="display:flex;flex-direction:column;gap:10px;"></div>
 
@@ -204,9 +253,9 @@
   </main>
 
   <!-- ========================================================================
-       FLOATING INTERACTIVE iPHONE (SHORT SMS + DETAILED EMAIL VIEWER)
+       FLOATING INTERACTIVE iPHONE (HIDDEN BY DEFAULT SO IT NEVER CLUTTERS!)
        ======================================================================== -->
-  <section id="phone-dock" class="phone-dock" aria-label="Two-Way Short SMS & Email Phone Simulator">
+  <section id="phone-dock" class="phone-dock hidden" aria-label="Two-Way Short SMS & Email Phone Simulator">
     <div class="phone-notch"></div>
     <div class="phone-header">
       <div class="phone-contact">
@@ -214,9 +263,9 @@
         <span id="phone-owner-number" class="phone-contact-sub">Short SMS (&lt;180 chars) • Detailed via Email</span>
       </div>
       <div style="display:flex;gap:4px;align-items:center;">
-        <button id="phone-tab-sms" class="cam-btn" style="padding:3px 7px;font-size:10px;background:#2563eb;color:#fff;">📱 SMS</button>
-        <button id="phone-tab-email" class="cam-btn" style="padding:3px 7px;font-size:10px;">📧 Email</button>
-        <button id="btn-close-phone" class="cam-btn" style="padding:3px 6px;" title="Minimize Phone">✕</button>
+        <button id="phone-tab-sms" class="cam-btn" type="button" style="padding:3px 7px;font-size:10px;background:#2563eb;color:#fff;">📱 SMS</button>
+        <button id="phone-tab-email" class="cam-btn" type="button" style="padding:3px 7px;font-size:10px;">📧 Email</button>
+        <button id="btn-close-phone" class="cam-btn" type="button" style="padding:3px 6px;" title="Minimize Phone">✕</button>
       </div>
     </div>
 
@@ -224,10 +273,10 @@
     <div id="phone-emails-list" class="phone-messages hidden" style="background:#0f172a;"></div>
 
     <div class="phone-quick-replies">
-      <button class="sms-chip" data-sms="B1">Reply "B1" (Approve Build)</button>
-      <button class="sms-chip" data-sms="1">Reply "1" (Approve Desk)</button>
-      <button class="sms-chip" data-sms="Shift">Reply "Shift"</button>
-      <button class="sms-chip" data-sms="Email me full breakdown">Email Details</button>
+      <button class="sms-chip" data-sms="B1" type="button">Reply "B1" (Approve Build)</button>
+      <button class="sms-chip" data-sms="1" type="button">Reply "1" (Approve Desk)</button>
+      <button class="sms-chip" data-sms="Shift" type="button">Reply "Shift"</button>
+      <button class="sms-chip" data-sms="Email me full breakdown" type="button">Email Details</button>
     </div>
 
     <form id="phone-form" class="phone-input-bar">
@@ -243,22 +292,22 @@
     <div class="modal-card">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <h3 style="font-size:15px;font-weight:800;">⚡ Launch $0.00 Worker Teardown (SOP-01)</h3>
-        <button id="close-modal-prospect" class="cam-btn">✕</button>
+        <button id="close-modal-prospect" class="cam-btn" type="button">✕</button>
       </div>
       <p style="font-size:12px;color:var(--text-secondary);line-height:1.45;">
-        <strong>@scout</strong> runs this audit locally at <strong>$0.00 token cost</strong>, files the Dossier in the Vault, emails you the full 4-point breakdown, and sends a <strong>short text (&lt;180 chars)</strong> to your phone.
+        <strong>@scout</strong> runs this audit locally at <strong>$0.00 token cost</strong>, files the Dossier in the Vault, emails you the full 4-point breakdown, and places an approval folder on your Boss Desk.
       </p>
       <form id="form-launch-prospect" style="display:flex;flex-direction:column;gap:12px;">
         <div class="form-group">
-          <label class="form-label">Live Website URL to Scrape (or leave blank for Simulated Prospect)</label>
+          <label class="form-label" for="input-prospect-url">Live Website URL to Scrape (or leave blank for Simulated Prospect)</label>
           <input id="input-prospect-url" class="form-input" type="text" placeholder="https://yourprospectdomain.com" />
         </div>
         <div class="form-group">
-          <label class="form-label">Business Name (Auto-detected if live URL provided)</label>
+          <label class="form-label" for="input-prospect-name">Business Name (Auto-detected if live URL provided)</label>
           <input id="input-prospect-name" class="form-input" type="text" placeholder="e.g. Lone Star Premier Roofing" />
         </div>
         <div class="form-group">
-          <label class="form-label">Industry Vertical</label>
+          <label class="form-label" for="input-prospect-vertical">Industry Vertical</label>
           <input id="input-prospect-vertical" class="form-input" type="text" value="Roofing & Storm Restoration" />
         </div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
@@ -275,21 +324,21 @@
   <div id="modal-sms-settings" class="modal-backdrop hidden">
     <div class="modal-card" style="width:540px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="font-size:15px;font-weight:800;">🧠 Chief of Staff Shift Limits, AI Brain & SMS/Email Setup</h3>
-        <button id="close-modal-sms" class="cam-btn">✕</button>
+        <h3 style="font-size:15px;font-weight:800;">⚙️ Shift Limits, Sandbox Mode &amp; SMS/Email Setup</h3>
+        <button id="close-modal-sms" class="cam-btn" type="button">✕</button>
       </div>
       <form id="form-sms-settings" style="display:flex;flex-direction:column;gap:10px;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
           <div class="form-group">
-            <label class="form-label">Max Marcus Shifts/Day</label>
+            <label class="form-label" for="input-max-shifts">Max Marcus Shifts/Day</label>
             <input id="input-max-shifts" class="form-input" type="number" min="1" max="20" value="4" />
           </div>
           <div class="form-group">
-            <label class="form-label">Daily API Cap ($ USD)</label>
+            <label class="form-label" for="input-daily-budget">Daily API Cap ($ USD)</label>
             <input id="input-daily-budget" class="form-input" type="number" step="0.05" value="0.50" />
           </div>
           <div class="form-group">
-            <label class="form-label">Outreach Mode</label>
+            <label class="form-label" for="input-simulation-mode">Outreach Mode</label>
             <select id="input-simulation-mode" class="form-input">
               <option value="true">🧪 Sandbox (Simulated)</option>
               <option value="false">🟢 Live Outreach</option>
@@ -299,7 +348,7 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div class="form-group">
-            <label class="form-label">Marcus Reasoning Brain (Argon-High / Pro)</label>
+            <label class="form-label" for="input-llm-provider">Marcus Reasoning Brain</label>
             <select id="input-llm-provider" class="form-input">
               <option value="auto">Auto-Detect (Gemini / OpenAI / Claude)</option>
               <option value="gemini">Google Gemini (gemini-2.5-pro)</option>
@@ -309,7 +358,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">LLM API Key (Optional)</label>
+            <label class="form-label" for="input-llm-key">LLM API Key (Optional)</label>
             <input id="input-llm-key" class="form-input" type="password" placeholder="Paste API key..." />
           </div>
         </div>
@@ -318,29 +367,29 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div class="form-group">
-            <label class="form-label">Your Mobile # (Short SMS &lt;180 chars)</label>
+            <label class="form-label" for="input-owner-phone">Your Mobile # (Short SMS &lt;180 chars)</label>
             <input id="input-owner-phone" class="form-input" type="text" value="+1 (512) 555-0199" />
           </div>
           <div class="form-group">
-            <label class="form-label">Your Email (For Detailed Reports &amp; Specs)</label>
-            <input id="input-owner-email" class="form-input" type="email" value="boss@tiberius.site" />
+            <label class="form-label" for="input-owner-email">Your Email (Detailed Reports &amp; Specs)</label>
+            <input id="input-owner-email" class="form-input" type="email" value="feedbackdaisy@gmail.com" />
           </div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div class="form-group">
-            <label class="form-label">SMS Key / Webhook (Textbelt / Twilio / GHL)</label>
+            <label class="form-label" for="input-textbelt-key">SMS Key / Webhook (Textbelt / Twilio / GHL)</label>
             <input id="input-textbelt-key" class="form-input" type="password" placeholder="Textbelt key or webhook" />
           </div>
           <div class="form-group">
-            <label class="form-label">Resend Email API Key / Webhook (Optional)</label>
+            <label class="form-label" for="input-resend-key">Resend Email API Key / Webhook (Optional)</label>
             <input id="input-resend-key" class="form-input" type="password" placeholder="re_... or email webhook" />
           </div>
         </div>
 
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
           <button type="button" id="cancel-modal-sms" class="btn-secondary-action">Close</button>
-          <button type="submit" class="hud-btn hud-btn-primary">Save Shift Cap &amp; Comms Config</button>
+          <button type="submit" class="hud-btn hud-btn-primary">Save Settings</button>
         </div>
       </form>
     </div>
@@ -352,8 +401,8 @@
   <div id="modal-mobile-deploy" class="modal-backdrop hidden">
     <div class="modal-card" style="width:540px;max-width:95vw;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <h3 style="font-size:15px;font-weight:800;">📲 Live Mobile Deployment &amp; How to Text Marcus</h3>
-        <button id="close-modal-mobile" class="cam-btn">✕</button>
+        <h3 style="font-size:15px;font-weight:800;">📲 Live Mobile Access &amp; How to Text Marcus</h3>
+        <button id="close-modal-mobile" class="cam-btn" type="button">✕</button>
       </div>
       <div id="mobile-deploy-body" style="display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--text-secondary);"></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
@@ -363,28 +412,28 @@
   </div>
 
   <!-- ========================================================================
-       THUMB-FRIENDLY MOBILE BOTTOM NAVIGATION BAR (VISIBLE ON PHONES)
+       THUMB-FRIENDLY MOBILE BOTTOM NAVIGATION BAR (ONLY ON PHONES <= 768px)
        ======================================================================== -->
   <nav id="mobile-bottom-nav" class="mobile-bottom-nav" aria-label="Mobile Navigation">
-    <button type="button" class="mobile-nav-btn active" data-mobile-view="phone">
+    <button type="button" class="mobile-nav-btn active" data-mobile-view="floor">
+      <span class="mobile-nav-icon">🏢</span>
+      <span>3D Office</span>
+    </button>
+    <button type="button" class="mobile-nav-btn" data-mobile-view="phone">
       <span class="mobile-nav-icon">💬</span>
       <span>Text Marcus</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-mobile-view="desk">
       <span class="mobile-nav-icon">📥</span>
-      <span>Desk</span>
+      <span>Boss Desk</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-mobile-view="build">
-      <span class="mobile-nav-icon">👁️</span>
-      <span>Build &amp; Eye</span>
+      <span class="mobile-nav-icon">🛠️</span>
+      <span>Build-Out</span>
     </button>
     <button type="button" class="mobile-nav-btn" data-mobile-view="emails">
       <span class="mobile-nav-icon">📧</span>
       <span>Emails</span>
-    </button>
-    <button type="button" class="mobile-nav-btn" data-mobile-view="floor">
-      <span class="mobile-nav-icon">🏢</span>
-      <span>3D Floor</span>
     </button>
   </nav>
 
